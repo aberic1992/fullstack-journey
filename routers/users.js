@@ -37,7 +37,7 @@ router.post("/", (req, res) => {
     typeof req.body.name !== "string" ||
     req.body.name.trim() === ""
   ) {
-    return res.status(400).json({ error: "name is required" });
+    return res.status(400).json({ error: "Name is required" });
   }
 
   const newId = users.length
@@ -64,10 +64,8 @@ router.put("/:id", loadUser, (req, res) => {
     return res.status(400).json({ error: "Name is required" });
   }
 
-  const indexOfUser = users.indexOf((user) => user.id === body.targetUser.id);
-
   req.targetUser.name = req.body.name.trim();
-  res.status(200).end();
+  res.status(200).json(req.targetUser);
 });
 
 module.exports = router;

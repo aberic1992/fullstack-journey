@@ -7,6 +7,7 @@
 - **Auto-restart**: `npm run dev` runs `node --watch app.js`, which restarts on every save.
 - **Notes rule**: `CLAUDE.md` tells Claude to log changes here.
 - **Git**: repo on branch `main`. `.gitignore` skips `node_modules/`, `.env`, `*.log` (`npm install` restores node_modules).
+- **GitHub**: public repo https://github.com/aberic1992/fullstack-journey (`origin`). Save work: `git add . && git commit -m "msg" && git push`.
 - **Route tests**: `bash test-routes.sh` (or `bash test-routes.sh <port>`) runs curl against every route. Server must be running; POST/DELETE change data.
 
 ## server.js (plain Node `http`)
@@ -39,10 +40,12 @@ Runs on `http://localhost:3000`. No framework, so routing is done by hand with `
 ## app.js (Express)
 
 - Installed `express`. `app.use(express.json())` parses JSON bodies into `req.body`.
-- Routes: `GET /`, `GET /users`, `GET /users/:id`, `POST /users`, `DELETE /users/:id` (same rules as server.js).
+- Routes: `GET /`, `GET /users`, `GET /users/:id`, `POST /users`, `PUT /users/:id`, `DELETE /users/:id`.
 - `/users/:id`: convert with `Number(req.params.id)` → `400` if invalid, `404` if not found.
 - `POST /users`: `400` if `req.body.name` isn't a non-empty string; name is trimmed; returns `201`.
 - `DELETE /users/:id`: `users` is `let` so it can be reassigned by `filter`; returns `204` via `res.status(204).end()`.
+- `PUT /users/:id`: same name check as POST (`400`), sets `req.targetUser.name` (trimmed), returns `200` + updated user.
+- Error message is `"Name is required"` in both POST and PUT.
 - Status codes: `200` OK, `201` created, `204` no content, `400` bad input, `404` not found, `500` server error.
 
 ### Middleware & errors
@@ -62,10 +65,13 @@ Runs on `http://localhost:3000`. No framework, so routing is done by hand with `
 - `middleware/errorHandlers.js`: exports plain functions `{ notFound, errorHandler }` (no Router needed).
 - In `app.js`: `app.use(notFound); app.use(errorHandler);` last, after all routes. No path, so they catch everything.
 - `require` paths must match folder names exactly, or the app crashes with `Cannot find module`.
+- `app.js` now only has: logger, `express.json()`, routers, `GET /`, error handlers, `listen`.
 
 ### Route middleware (`loadUser` in routers/users.js)
 
 - `loadUser(req, res, next)`: checks id (`400`), finds user (`404`), sets `req.targetUser`, calls `next()`.
-- Used per route: `router.get("/:id", loadUser, handler)`, same for `DELETE`. Removes duplicated checks.
+- Used per route: `router.get("/:id", loadUser, handler)`, same for `PUT` and `DELETE`. Removes duplicated checks.
 - Always `return res...` after sending a response, or code keeps running → `ERR_HTTP_HEADERS_SENT` (one response per request).
-- `app.js` now only has: logger, `express.json()`, routers, `GET /`, error handlers, `listen`.
+- `find` returns a **reference**, so `req.targetUser` is the same object as in `users`; changing its props updates the array (a copy `{ ...user }` would not).
+- `indexOf(fn)` doesn't take a function (returns `-1` → `users[-1]` is `undefined`). Use `findIndex(fn)`.
+- `res.status(200)` alone sends nothing; always finish with `.json(...)` or `.end()`, or the request hangs.
