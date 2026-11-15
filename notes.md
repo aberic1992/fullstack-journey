@@ -46,6 +46,18 @@ Runs on `http://localhost:3000`. No framework, so routing is done by hand with `
 - `DELETE /users/:id`: `users` is `let` so it can be reassigned by `filter`; returns `204` via `res.status(204).end()`.
 - `PUT /users/:id`: same name check as POST (`400`), sets `req.targetUser.name` (trimmed), returns `200` + updated user.
 - Error message is `"Name is required"` in both POST and PUT.
+
+### Pagination & sorting (`GET /users`)
+
+- Query params: `?page=2&limit=5` (defaults `page=1`, `limit=5`). Read from `req.query` (always strings → `Number(...)`).
+- `400` if page/limit isn't a positive integer (`abc`, `0`, `-5`, `1.5`, empty).
+- Response: `{ page, limit, total, users }`. Page past the end → `users: []`.
+- `start = (page - 1) * limit` (parentheses! `page - 1 * limit` is `page - limit`), then `slice(start, start + limit)`.
+- Sort by name: `[...users].sort((a, b) => a.name.localeCompare(b.name))`.
+  - Strings: `localeCompare` (handles š, č…). `a - b` only works for numbers (strings give `NaN` → no sorting).
+  - Sort **before** slicing, or each page is only sorted within itself.
+  - `.sort()` mutates the array, so copy first with `[...users]`.
+- Only one `router.get("/")`: Express uses the first matching route, so a duplicate below it never runs.
 - Status codes: `200` OK, `201` created, `204` no content, `400` bad input, `404` not found, `500` server error.
 
 ### Middleware & errors
@@ -61,6 +73,7 @@ Runs on `http://localhost:3000`. No framework, so routing is done by hand with `
 ### Refactor (split into files)
 
 - `routers/users.js`: `express.Router()` with all `/users` routes + the `users` array; `module.exports = router`.
+- `users` array has 22 mock users (ids 1–22). New POST ids start at 23.
 - Mounted with `app.use("/users", usersRouter)`, so paths inside are relative (`/`, `/:id`).
 - `middleware/errorHandlers.js`: exports plain functions `{ notFound, errorHandler }` (no Router needed).
 - In `app.js`: `app.use(notFound); app.use(errorHandler);` last, after all routes. No path, so they catch everything.
