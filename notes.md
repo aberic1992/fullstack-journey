@@ -8,7 +8,7 @@
 - **Notes rule**: `CLAUDE.md` tells Claude to log changes here.
 - **Git**: repo on branch `main`. `.gitignore` skips `node_modules/`, `.env`, `*.log` (`npm install` restores node_modules).
 - **GitHub**: public repo https://github.com/aberic1992/fullstack-journey (`origin`). Save work: `git add . && git commit -m "msg" && git push`.
-- **Route tests**: `bash test-routes.sh` (or `bash test-routes.sh <port>`) runs curl against every route. Server must be running; POST/DELETE change data.
+- **Route tests**: `bash test-routes.sh` (or `bash test-routes.sh <port>`) runs curl against every route (incl. PUT, pagination, search, sort), each with its expected result in a comment. Server must be running; POST/PUT/DELETE change data, so restart for a clean run.
 
 ## server.js (plain Node `http`)
 
@@ -47,18 +47,23 @@ Runs on `http://localhost:3000`. No framework, so routing is done by hand with `
 - `PUT /users/:id`: same name check as POST (`400`), sets `req.targetUser.name` (trimmed), returns `200` + updated user.
 - Error message is `"Name is required"` in both POST and PUT.
 
-### Pagination & sorting (`GET /users`)
+### Pagination, search & sorting (`GET /users`)
 
-- Query params: `?page=2&limit=5` (defaults `page=1`, `limit=5`). Read from `req.query` (always strings → `Number(...)`).
-- `400` if page/limit isn't a positive integer (`abc`, `0`, `-5`, `1.5`, empty).
-- Response: `{ page, limit, total, users }`. Page past the end → `users: []`.
-- `start = (page - 1) * limit` (parentheses! `page - 1 * limit` is `page - limit`), then `slice(start, start + limit)`.
-- Sort by name: `[...users].sort((a, b) => a.name.localeCompare(b.name))`.
-  - Strings: `localeCompare` (handles š, č…). `a - b` only works for numbers (strings give `NaN` → no sorting).
-  - Sort **before** slicing, or each page is only sorted within itself.
-  - `.sort()` mutates the array, so copy first with `[...users]`.
+- Query params: `?page=2&limit=5&search=mi&sort=name` (defaults `page=1`, `limit=5`, no search, original order).
+- `req.query` values are always strings; repeated params (`?a=1&a=2`) become an **array** → check `typeof x === "string"`.
+- `400` if page/limit isn't a positive integer, search is blank/numeric/not a string, or sort isn't `name` / `-name`.
+- Order: **filter → sort → slice**. `total` = number of matches (`processedUsers.length`), not all users.
+- Search: `name.toLocaleLowerCase().startsWith(search.toLocaleLowerCase())` (lowercase **both** sides).
+- Sort: `localeCompare` for strings (`a - b` only for numbers); `-name` = `b.name.localeCompare(a.name)`.
+- `.sort()` mutates, so sort a copy (`[...users]`; `filter` already returns a new array).
+- Page: `start = (page - 1) * limit` (parentheses!), then `slice(start, start + limit)`. Past the end → `[]`.
+- "Neither A nor B" is `x !== A && x !== B`. With `||` it's always true.
+- Missing `||` between `(...)` groups makes JS call the first one as a function → `... is not a function`.
 - Only one `router.get("/")`: Express uses the first matching route, so a duplicate below it never runs.
-- Status codes: `200` OK, `201` created, `204` no content, `400` bad input, `404` not found, `500` server error.
+- `Number(...)` always returns a number, so `typeof page === "string"` is never true (can be removed).
+- Check if a string is text vs number: `Number(s)` is `NaN` for text, but `Number("")` / `Number(" ")` are `0`.
+  - Strict positive int: `/^[1-9]\d*$/.test(s)`. Letters only (incl. š, č): `/^\p{L}+$/u.test(s)`.
+- `node --watch` sometimes misses a save → restart `npm run dev` if responses look like old code.
 
 ### Middleware & errors
 

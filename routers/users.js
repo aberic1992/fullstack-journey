@@ -29,6 +29,8 @@ let users = [
 router.get("/", (req, res) => {
   const page = Number(req.query.page ?? 1);
   const limit = Number(req.query.limit ?? 5);
+  const sort = req.query.sort;
+  const search = req.query.search;
 
   if (
     typeof page === "string" ||
@@ -40,11 +42,40 @@ router.get("/", (req, res) => {
   ) {
     return res.status(400).json({ error: "Incorrect query value" });
   }
-  const start = (page - 1) * limit;
-  const sorted = [...users].sort((a, b) => a.name.localeCompare(b.name));
-  const result = sorted.slice(start, start + limit);
 
-  res.status(200).json({ page, limit, total: users.length, users: result });
+  if (
+    (search !== undefined && typeof search !== "string") ||
+    (search && search.trim() === "") ||
+    (search && !Number.isNaN(Number(search)))
+  ) {
+    return res.status(400).json({ error: "Incorrect search value" });
+  }
+
+  if (sort && sort !== "name" && sort !== "-name") {
+    return res
+      .status(400)
+      .json({ error: "Accepted sort values are 'name' or '-name'" });
+  }
+
+  const start = (page - 1) * limit;
+
+  const processedUsers = search
+    ? users.filter((user) =>
+        user.name.toLocaleLowerCase().startsWith(search.toLocaleLowerCase()),
+      )
+    : [...users];
+
+  if (sort) {
+    sort === "name"
+      ? processedUsers.sort((a, b) => a.name.localeCompare(b.name))
+      : processedUsers.sort((a, b) => b.name.localeCompare(a.name));
+  }
+
+  const result = processedUsers.slice(start, start + limit);
+
+  res
+    .status(200)
+    .json({ page, limit, total: processedUsers.length, users: result });
 });
 
 function loadUser(req, res, next) {
