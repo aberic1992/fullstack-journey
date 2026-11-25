@@ -26,51 +26,50 @@ let users = [
   { id: 22, name: "Tamara" },
 ];
 
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 100;
+
 router.get("/", (req, res) => {
   const page = Number(req.query.page ?? 1);
-  const limit = Number(req.query.limit ?? 5);
+  const requestedLimit = Number(req.query.limit ?? DEFAULT_LIMIT);
   const sort = req.query.sort;
-  const search = req.query.search;
+  const search = req.query.search ?? "";
 
   if (
-    typeof page === "string" ||
-    typeof limit === "string" ||
     !Number.isInteger(page) ||
-    !Number.isInteger(limit) ||
+    !Number.isInteger(requestedLimit) ||
     page <= 0 ||
-    limit <= 0
+    requestedLimit <= 0
   ) {
     return res.status(400).json({ error: "Incorrect query value" });
   }
 
-  if (
-    (search !== undefined && typeof search !== "string") ||
-    (search && search.trim() === "") ||
-    (search && !Number.isNaN(Number(search)))
-  ) {
+  // repeated ?search=a&search=b becomes an array
+  if (typeof search !== "string") {
     return res.status(400).json({ error: "Incorrect search value" });
   }
 
-  if (sort && sort !== "name" && sort !== "-name") {
+  if (sort !== undefined && sort !== "name" && sort !== "-name") {
     return res
       .status(400)
       .json({ error: "Accepted sort values are 'name' or '-name'" });
   }
 
-  const start = (page - 1) * limit;
+  const limit = Math.min(requestedLimit, MAX_LIMIT);
+  const term = search.trim().toLocaleLowerCase();
 
-  const processedUsers = search
-    ? users.filter((user) =>
-        user.name.toLocaleLowerCase().startsWith(search.toLocaleLowerCase()),
-      )
+  // empty search = no filter
+  const processedUsers = term
+    ? users.filter((user) => user.name.toLocaleLowerCase().includes(term))
     : [...users];
 
-  if (sort) {
-    sort === "name"
-      ? processedUsers.sort((a, b) => a.name.localeCompare(b.name))
-      : processedUsers.sort((a, b) => b.name.localeCompare(a.name));
+  if (sort === "name") {
+    processedUsers.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sort === "-name") {
+    processedUsers.sort((a, b) => b.name.localeCompare(a.name));
   }
 
+  const start = (page - 1) * limit;
   const result = processedUsers.slice(start, start + limit);
 
   res

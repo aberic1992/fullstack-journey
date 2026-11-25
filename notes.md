@@ -49,18 +49,23 @@ Runs on `http://localhost:3000`. No framework, so routing is done by hand with `
 
 ### Pagination, search & sorting (`GET /users`)
 
-- Query params: `?page=2&limit=5&search=mi&sort=name` (defaults `page=1`, `limit=5`, no search, original order).
+- Query params: `?page=2&limit=10&search=mi&sort=name` (defaults `page=1`, `limit=10`, no search, original order).
+- `limit` is capped at `MAX_LIMIT = 100` with `Math.min` (`?limit=1000` → 100), so one request can't load a whole table.
 - `req.query` values are always strings; repeated params (`?a=1&a=2`) become an **array** → check `typeof x === "string"`.
-- `400` if page/limit isn't a positive integer, search is blank/numeric/not a string, or sort isn't `name` / `-name`.
+- `400` only for bad input: page/limit not a positive integer, search not a string (repeated param), sort not `name` / `-name`.
+- Repeated `?page=1&page=2` → `Number(["1","2"])` is `NaN` → `Number.isInteger` already catches it.
+- Search with no matches (e.g. `?search=2`) is **not** an error → `200` + `users: []`.
+- Empty/blank `?search=` = no filter (frontends send it when the search box is empty). Search is trimmed before matching.
 - Order: **filter → sort → slice**. `total` = number of matches (`processedUsers.length`), not all users.
-- Search: `name.toLocaleLowerCase().startsWith(search.toLocaleLowerCase())` (lowercase **both** sides).
+- Search is "contains": `name.toLocaleLowerCase().includes(term)` (`?search=ana` finds Bojana, Ivana, Jovana). Lowercase **both** sides.
 - Sort: `localeCompare` for strings (`a - b` only for numbers); `-name` = `b.name.localeCompare(a.name)`.
+- Use `if / else` (not a ternary) when you only want the side effect, e.g. which sort to run.
 - `.sort()` mutates, so sort a copy (`[...users]`; `filter` already returns a new array).
 - Page: `start = (page - 1) * limit` (parentheses!), then `slice(start, start + limit)`. Past the end → `[]`.
 - "Neither A nor B" is `x !== A && x !== B`. With `||` it's always true.
 - Missing `||` between `(...)` groups makes JS call the first one as a function → `... is not a function`.
 - Only one `router.get("/")`: Express uses the first matching route, so a duplicate below it never runs.
-- `Number(...)` always returns a number, so `typeof page === "string"` is never true (can be removed).
+- `Number(...)` always returns a number, so `typeof page === "string"` is never true (removed, dead code).
 - Check if a string is text vs number: `Number(s)` is `NaN` for text, but `Number("")` / `Number(" ")` are `0`.
   - Strict positive int: `/^[1-9]\d*$/.test(s)`. Letters only (incl. š, č): `/^\p{L}+$/u.test(s)`.
 - `node --watch` sometimes misses a save → restart `npm run dev` if responses look like old code.
